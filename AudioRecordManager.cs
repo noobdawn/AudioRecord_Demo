@@ -4,11 +4,11 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-[RequireComponent(typeof(AudioSource))]
 public class AudioRecordManager : MonoBehaviour {
 
     public static AudioRecordManager Instance = null;
     public bool IsRecording = false;
+    public bool IsRealTime = false;
 
     private AudioSource audioSource;
     private AudioClip audioClip;
@@ -18,6 +18,7 @@ public class AudioRecordManager : MonoBehaviour {
     private const int SAMPLES = 44100;
     private const int HEADS = 44;
     private string deviceName;
+    private int curPosition;
 
     private void Awake()
     {
@@ -39,8 +40,8 @@ public class AudioRecordManager : MonoBehaviour {
             return;
         if (Microphone.IsRecording(deviceName))
         {
-            int curPos = Microphone.GetPosition(deviceName);
-            float length = (float)curPos / SAMPLES;
+            curPosition = Microphone.GetPosition(deviceName);
+            float length = (float)curPosition / SAMPLES;
             Debug.Log("Length : " + length);
             if (length >= maxLength)
                 StopRecord();
@@ -61,7 +62,7 @@ public class AudioRecordManager : MonoBehaviour {
         if (!IsRecording || string.IsNullOrEmpty(deviceName))
             return;
         Microphone.End(deviceName);
-        SaveToWav(Time.realtimeSinceStartup.ToString(), audioClip);
+        SaveToWav(Time.realtimeSinceStartup.ToString(), audioClip, curPosition);
         IsRecording = false;
     }
 
@@ -72,7 +73,7 @@ public class AudioRecordManager : MonoBehaviour {
         return devices.Length == 0 ? "" : devices[0];
     }
 
-    private void SaveToWav(string name, AudioClip clip)
+    private void SaveToWav(string name, AudioClip clip, int samplePosition)
     {
         if (string.IsNullOrEmpty(name) || clip == null)
             return;
@@ -82,7 +83,7 @@ public class AudioRecordManager : MonoBehaviour {
             if (!Directory.Exists(savePath))
                 Directory.CreateDirectory(savePath);
             FileStream fileStream = new FileStream(filename, FileMode.CreateNew);
-            WriteData(fileStream, clip);
+            WriteData(fileStream, clip, samplePosition);
         }
         catch(Exception ex)
         {
@@ -96,7 +97,8 @@ public class AudioRecordManager : MonoBehaviour {
     /// </summary>
     /// <param name="stream"></param>
     /// <param name="clip"></param>
-    private void WriteData(FileStream stream, AudioClip clip)
+    /// <param name="samplePosition"></param>
+    private void WriteData(FileStream stream, AudioClip clip, int samplePosition = -1)
     {
         //先写空白文件头占位
         byte emptybyte = new byte();
@@ -105,7 +107,7 @@ public class AudioRecordManager : MonoBehaviour {
             stream.WriteByte(emptybyte);
         }
         //然后得到采样数据
-        float[] samples = new float[clip.samples];
+        float[] samples = samplePosition == -1 ? new float[clip.samples] : new float[samplePosition];
         clip.GetData(samples, 0);
         byte[] outData = new byte[samples.Length * 2];
         int reScaleFactor = 32767;
@@ -121,7 +123,7 @@ public class AudioRecordManager : MonoBehaviour {
         //开始写文件头
         int hz = clip.frequency;
         int channels = clip.channels;
-        int allsamples = clip.samples;
+        int allsamples = samplePosition == -1 ? clip.samples : samplePosition;
         //文件流指针重置
         stream.Seek(0, SeekOrigin.Begin);
         //写RIFF，指示文件大小

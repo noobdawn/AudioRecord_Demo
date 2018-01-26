@@ -19,5 +19,14 @@ public class Test : MonoBehaviour {
                 AudioRecordManager.Instance.StartRecord();
             }
         }
+
+        if (GUILayout.Button("StartChat"))
+        {
+            RealtimeAudioManager.Instance.StartChat();
+        }
+        if (GUILayout.Button("StopChat"))
+        {
+            RealtimeAudioManager.Instance.StopChat();
+        }
     }
 }
